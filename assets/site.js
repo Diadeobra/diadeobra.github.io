@@ -1,15 +1,15 @@
-/* Site da Dia de Obra · página única · 18/11/2026
+/* Site da Dia de Obra · início, Como funciona e Quem somos · 18/11/2026
  *
  * ── FOTOS DAS CASAS ──────────────────────────────────────────────────────────────
  * Esta lista é o único lugar para trocar, tirar ou reordenar casas (topo, carrossel,
- * cartões e foto ampliada saem todos daqui).
+ * cartões e foto ampliada saem todos daqui, nas três páginas).
  *  - fotos: nomes-base em assets/casas/, sem o tamanho. A primeira é a capa.
  *    Os arquivos -600, -900 e -1800 saem de
  *    ../2026-11-18_site-dia-de-obra_montagem/prepara-fotos.py, que lê
  *    recebidos/2026-11-18_site-casas/ e usa a pasta melhoradas/ quando a foto existe lá.
  *    Para trocar uma foto: ponha a nova em melhoradas/ com o mesmo nome e rode o script.
- *  - situacao: 'construida' ou 'projeto'. Com confirmar: true o selo sai tracejado
- *    (data-pendente) até o Fábio confirmar.
+ *  - situacao: 'construida' ou 'projeto'. Com confirmar: true o selo fica escondido no ar
+ *    (data-pendente) até o Fábio confirmar; aí é só trocar para confirmar: false.
  *  - tipo: 'Térrea', 'Sobrado' ou '' (sem selo).
  *  - foco: ponto que fica no centro quando a foto é cortada (x da esquerda, y do topo; 0 a 1).
  * ──────────────────────────────────────────────────────────────────────────────── */
@@ -26,12 +26,13 @@ const CASAS = [
 (() => {
 'use strict';
 // Script comum (não módulo): funciona até abrindo o arquivo direto no navegador (file://);
-// nesse caso o 3D não carrega e a página mostra a versão parada.
+// nesse caso o 3D não carrega e a página mostra a versão parada. Cada parte só liga se existir
+// na página (o mesmo script serve às três).
 const AQUI = document.currentScript.src;
 const { Mola, MOLAS, anima, tarefa, acorda } = window.DiaDeObraMola;
-const R = window.DiaDeObraRolagem; // rolagem suave e efeitos que seguem a rolagem (assets/rolagem.js)
+const R = window.DiaDeObraRolagem; // rolagem suave, cor de fundo e efeitos que seguem a rolagem
 const BASE = new URL('casas/', AQUI).href;
-const foto =(nome, tam) => `${BASE}${nome}-${tam}.jpg`;
+const foto = (nome, tam) => `${BASE}${nome}-${tam}.jpg`;
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const calmo = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -49,20 +50,13 @@ function chips(casa) {
   return h;
 }
 
-/* ── Obras: cartões (miniaturas no modo 3D, grade sem 3D) ── */
+/* ── Obras (só na página inicial): miniaturas no modo 3D, grade sem 3D ── */
 const obras = $('#obras');
-const lista = $('.lista', obras);
-lista.innerHTML = CASAS.map((casa, i) => `
-  <li><button class="cartao" type="button" data-i="${i}" aria-current="${i === 0}">
-    <img src="${foto(casa.fotos[0], 600)}" alt="" loading="lazy" decoding="async">
-    <span class="cartao-txt"><strong>${esc(casa.titulo)}</strong><span class="chips">${chips(casa)}</span></span>
-  </button></li>`).join('');
-
 let atual = 0;
 let carrossel = null; // controle do carrossel 3D (quando existir)
 let pendenteIr = null;
-
 function legenda(i) {
+  if (!obras) return;
   const casa = CASAS[i];
   $('.contador', obras).innerHTML = `<b>${doisDigitos(i + 1)}</b> / ${doisDigitos(CASAS.length)}`;
   $('.legenda h3', obras).textContent = casa.titulo;
@@ -77,109 +71,143 @@ function selecionar(i, deOnde) {
     else pendenteIr = atual;
   }
 }
-legenda(0);
-
-lista.addEventListener('click', (e) => {
-  const b = e.target.closest('.cartao');
-  if (!b) return;
-  const i = Number(b.dataset.i);
-  if (obras.dataset.modo === 'grade') abrir(i);
-  else selecionar(i);
-});
-$('.seta.ant', obras).addEventListener('click', () => selecionar(atual - 1));
-$('.seta.prox', obras).addEventListener('click', () => selecionar(atual + 1));
-$('.ver-fotos', obras).addEventListener('click', () => abrir(atual));
-$('.carrossel', obras).addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowLeft') { e.preventDefault(); selecionar(atual - 1); }
-  else if (e.key === 'ArrowRight') { e.preventDefault(); selecionar(atual + 1); }
-  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(atual); }
-});
+if (obras) {
+  const lista = $('.lista', obras);
+  lista.innerHTML = CASAS.map((casa, i) => `
+    <li><button class="cartao" type="button" data-i="${i}" aria-current="${i === 0}">
+      <img src="${foto(casa.fotos[0], 600)}" alt="" loading="lazy" decoding="async">
+      <span class="cartao-txt"><strong>${esc(casa.titulo)}</strong><span class="chips">${chips(casa)}</span></span>
+    </button></li>`).join('');
+  legenda(0);
+  lista.addEventListener('click', (e) => {
+    const b = e.target.closest('.cartao');
+    if (!b) return;
+    const i = Number(b.dataset.i);
+    if (obras.dataset.modo === 'grade') abrir(i);
+    else selecionar(i);
+  });
+  $('.seta.ant', obras).addEventListener('click', () => selecionar(atual - 1));
+  $('.seta.prox', obras).addEventListener('click', () => selecionar(atual + 1));
+  $('.ver-fotos', obras).addEventListener('click', () => abrir(atual));
+  $('.carrossel', obras).addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); selecionar(atual - 1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); selecionar(atual + 1); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(atual); }
+  });
+  if (calmo) obras.dataset.modo = 'grade'; // reduzir movimento: sem carrossel girando
+}
 
 /* ── Foto ampliada: <dialog> nativo; entra e sai por mola ── */
 const dlg = $('.ampliada');
-const caixa = $('.amp-caixa', dlg);
-const imgAmp = $('.amp-foto img', dlg);
-let ampCasa = 0;
-let ampFoto = 0;
-const mEsc = new Mola(0.94, MOLAS.posicao, 1e-4);
-const mOp = new Mola(0, MOLAS.posicao, 1e-3);
-const itemAmp = {
-  molas: [mEsc, mOp],
-  desenha() {
-    caixa.style.scale = mEsc.x;
-    caixa.style.opacity = Math.max(0, Math.min(1, mOp.x));
-  },
-  fim: null,
-};
+let abrir = () => {};
+if (dlg) {
+  const caixa = $('.amp-caixa', dlg);
+  const imgAmp = $('.amp-foto img', dlg);
+  let ampCasa = 0;
+  let ampFoto = 0;
+  const mEsc = new Mola(0.94, MOLAS.posicao, 1e-4);
+  const mOp = new Mola(0, MOLAS.posicao, 1e-3);
+  const itemAmp = {
+    molas: [mEsc, mOp],
+    desenha() {
+      caixa.style.scale = mEsc.x;
+      caixa.style.opacity = Math.max(0, Math.min(1, mOp.x));
+    },
+    fim: null,
+  };
+  const mostrarAmp = () => {
+    const casa = CASAS[ampCasa];
+    const nome = casa.fotos[ampFoto];
+    imgAmp.src = foto(nome, 900);
+    imgAmp.srcset = `${foto(nome, 900)} 900w, ${foto(nome, 1800)} 1800w`;
+    imgAmp.sizes = '(max-width: 760px) 100vw, 80vw';
+    imgAmp.alt = casa.fotos.length > 1 ? `${casa.titulo}, foto ${ampFoto + 1} de ${casa.fotos.length}` : casa.titulo;
+    $('#amp-titulo').textContent = casa.titulo;
+    $('.chips', dlg).innerHTML = chips(casa);
+    $('.amp-fotos', dlg).innerHTML = casa.fotos.length > 1
+      ? casa.fotos.map((n, k) => `<button type="button" data-k="${k}" aria-label="Foto ${k + 1}" aria-current="${k === ampFoto}"><img src="${foto(n, 600)}" alt=""></button>`).join('')
+      : '';
+  };
+  abrir = (i, k = 0) => {
+    ampCasa = (i + CASAS.length) % CASAS.length;
+    ampFoto = k;
+    mostrarAmp();
+    if (!dlg.open) dlg.showModal();
+    itemAmp.fim = null;
+    if (calmo) { mEsc.pula(1); mOp.pula(1); itemAmp.desenha(); return; }
+    mEsc.alvo = 1;
+    mOp.alvo = 1;
+    anima(itemAmp);
+  };
+  const fechar = () => {
+    if (!dlg.open) return;
+    const fecha = () => { dlg.close(); mEsc.pula(0.94); mOp.pula(0); itemAmp.desenha(); };
+    if (calmo) { fecha(); return; }
+    mEsc.alvo = 0.96;
+    mOp.alvo = 0;
+    itemAmp.fim = fecha;
+    anima(itemAmp);
+  };
+  const trocarCasa = (d) => {
+    ampCasa = (ampCasa + d + CASAS.length) % CASAS.length;
+    ampFoto = 0;
+    mostrarAmp();
+    selecionar(ampCasa); // o carrossel acompanha por trás
+    if (!calmo) { mEsc.x = 0.985; anima(itemAmp); }
+  };
+  dlg.addEventListener('cancel', (e) => { e.preventDefault(); fechar(); });
+  dlg.addEventListener('click', (e) => {
+    if (e.target === dlg || e.target === caixa || e.target.classList.contains('amp-foto')) fechar();
+  });
+  $('.amp-fechar', dlg).addEventListener('click', fechar);
+  $('.amp-ant', dlg).addEventListener('click', () => trocarCasa(-1));
+  $('.amp-prox', dlg).addEventListener('click', () => trocarCasa(1));
+  $('.amp-fotos', dlg).addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (b) { ampFoto = Number(b.dataset.k); mostrarAmp(); }
+  });
+  dlg.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') trocarCasa(-1);
+    else if (e.key === 'ArrowRight') trocarCasa(1);
+  });
+  let toqueAmp = null; // deslizar o dedo para o lado troca de casa
+  dlg.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') toqueAmp = { x: e.clientX, y: e.clientY }; });
+  dlg.addEventListener('pointerup', (e) => {
+    if (!toqueAmp) return;
+    const dx = e.clientX - toqueAmp.x;
+    const dy = e.clientY - toqueAmp.y;
+    toqueAmp = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) trocarCasa(dx < 0 ? 1 : -1);
+  });
+}
 
-function mostrarAmp() {
-  const casa = CASAS[ampCasa];
-  const nome = casa.fotos[ampFoto];
-  imgAmp.src = foto(nome, 900);
-  imgAmp.srcset = `${foto(nome, 900)} 900w, ${foto(nome, 1800)} 1800w`;
-  imgAmp.sizes = '(max-width: 760px) 100vw, 80vw';
-  imgAmp.alt = casa.fotos.length > 1 ? `${casa.titulo}, foto ${ampFoto + 1} de ${casa.fotos.length}` : casa.titulo;
-  $('#amp-titulo').textContent = casa.titulo;
-  $('.chips', dlg).innerHTML = chips(casa);
-  const miniaturas = $('.amp-fotos', dlg);
-  miniaturas.innerHTML = casa.fotos.length > 1
-    ? casa.fotos.map((n, k) => `<button type="button" data-k="${k}" aria-label="Foto ${k + 1}" aria-current="${k === ampFoto}"><img src="${foto(n, 600)}" alt=""></button>`).join('')
-    : '';
+/* ── Menu do celular: painel de vidro que abre e fecha por mola ── */
+const botaoMenu = $('.topo-menu');
+const menu = $('#menu-movel');
+if (botaoMenu && menu) {
+  const mA = new Mola(0, MOLAS.toque, 1e-3);
+  const itemMenu = {
+    molas: [mA],
+    desenha() {
+      menu.style.opacity = Math.max(0, Math.min(1, mA.x)).toFixed(3);
+      menu.style.scale = (0.94 + 0.06 * mA.x).toFixed(4);
+    },
+    fim: null,
+  };
+  const abrirMenu = (sim) => {
+    botaoMenu.setAttribute('aria-expanded', String(sim));
+    if (sim) menu.hidden = false;
+    itemMenu.fim = sim ? null : () => { menu.hidden = true; };
+    mA.alvo = sim ? 1 : 0;
+    if (calmo) { mA.pula(mA.alvo); itemMenu.desenha(); itemMenu.fim?.(); return; }
+    anima(itemMenu);
+  };
+  botaoMenu.addEventListener('click', () => abrirMenu(menu.hidden || mA.alvo === 0));
+  menu.addEventListener('click', (e) => { if (e.target.closest('a')) abrirMenu(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { abrirMenu(false); botaoMenu.focus(); } });
 }
-function abrir(i, k = 0) {
-  ampCasa = (i + CASAS.length) % CASAS.length;
-  ampFoto = k;
-  mostrarAmp();
-  if (!dlg.open) dlg.showModal();
-  itemAmp.fim = null;
-  if (calmo) { mEsc.pula(1); mOp.pula(1); itemAmp.desenha(); return; }
-  mEsc.alvo = 1;
-  mOp.alvo = 1;
-  anima(itemAmp);
-}
-function fechar() {
-  if (!dlg.open) return;
-  const fecha = () => { dlg.close(); mEsc.pula(0.94); mOp.pula(0); itemAmp.desenha(); };
-  if (calmo) { fecha(); return; }
-  mEsc.alvo = 0.96;
-  mOp.alvo = 0;
-  itemAmp.fim = fecha;
-  anima(itemAmp);
-}
-function trocarCasa(d) {
-  ampCasa = (ampCasa + d + CASAS.length) % CASAS.length;
-  ampFoto = 0;
-  mostrarAmp();
-  selecionar(ampCasa); // o carrossel acompanha por trás
-  if (!calmo) { mEsc.x = 0.985; anima(itemAmp); }
-}
-dlg.addEventListener('cancel', (e) => { e.preventDefault(); fechar(); });
-dlg.addEventListener('click', (e) => {
-  if (e.target === dlg || e.target === caixa || e.target.classList.contains('amp-foto')) fechar();
-});
-$('.amp-fechar', dlg).addEventListener('click', fechar);
-$('.amp-ant', dlg).addEventListener('click', () => trocarCasa(-1));
-$('.amp-prox', dlg).addEventListener('click', () => trocarCasa(1));
-$('.amp-fotos', dlg).addEventListener('click', (e) => {
-  const b = e.target.closest('button');
-  if (b) { ampFoto = Number(b.dataset.k); mostrarAmp(); }
-});
-dlg.addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowLeft') trocarCasa(-1);
-  else if (e.key === 'ArrowRight') trocarCasa(1);
-});
-// deslizar o dedo para o lado troca de casa
-let toqueAmp = null;
-dlg.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') toqueAmp = { x: e.clientX, y: e.clientY }; });
-dlg.addEventListener('pointerup', (e) => {
-  if (!toqueAmp) return;
-  const dx = e.clientX - toqueAmp.x;
-  const dy = e.clientY - toqueAmp.y;
-  toqueAmp = null;
-  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) trocarCasa(dx < 0 ? 1 : -1);
-});
 
-/* ── Âncoras: rolam pela mesma mola da rolagem suave (interrompível por qualquer gesto) ── */
+/* ── Âncoras da mesma página: rolam pela mesma mola da rolagem suave ── */
 const rolarPara = (el) => R.irPara(el);
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[href^="#"]');
@@ -194,6 +222,46 @@ document.addEventListener('click', (e) => {
   alvo.focus({ preventScroll: true });
 });
 
+/* ── Passagem entre páginas ──
+   Com View Transitions entre documentos (Chrome, Safari 18.2+), quem faz é o CSS. Sem suporte,
+   a página some por mola (curta) e a próxima já abre na mesma cor de fundo (nada de tela branca). */
+const temVT = 'onpagereveal' in window && CSS.supports('selector(::view-transition)');
+document.addEventListener('click', (e) => {
+  if (temVT || calmo || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target.closest('a[href]');
+  if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+  const url = new URL(a.href, location.href);
+  if (url.origin !== location.origin || (url.pathname === location.pathname && url.hash)) return;
+  e.preventDefault();
+  try { sessionStorage.setItem('dob-fundo', raiz.style.backgroundColor); } catch (er) { /* tudo bem */ }
+  const conteudo = [$('main'), $('.rodape')].filter(Boolean);
+  const mS = new Mola(1, { response: 0.22, dampingFraction: 1 }, 0.02);
+  mS.alvo = 0;
+  anima({ molas: [mS], desenha() { for (const el of conteudo) el.style.opacity = Math.max(0, mS.x).toFixed(3); }, fim() { location.href = url.href; } });
+});
+
+/* ── Título da página: entra com mola (as palavras sobem e aparecem uma depois da outra) ── */
+const titulo = $('[data-entra]');
+if (titulo && !calmo) {
+  const partes = [...titulo.children];
+  const molas = partes.map(() => new Mola(0, { response: 0.6, dampingFraction: 0.86 }, 1e-3));
+  for (const p of partes) { p.style.display = 'block'; p.style.opacity = '0'; p.style.translate = '0 0.35em'; }
+  raiz.classList.remove('entrando');
+  const item = {
+    molas,
+    desenha() {
+      partes.forEach((p, i) => {
+        const v = molas[i].x;
+        p.style.opacity = v >= 1 ? '' : Math.max(0, Math.min(1, v * 1.4)).toFixed(3);
+        p.style.translate = v >= 1 ? '' : `0 ${((1 - v) * 0.35).toFixed(3)}em`;
+      });
+    },
+  };
+  partes.forEach((p, i) => setTimeout(() => { molas[i].alvo = 1; anima(item); }, 60 + i * 70));
+} else {
+  raiz.classList.remove('entrando');
+}
+
 /* ── Toque nos botões sólidos: afunda e volta pela mola (os de vidro esticam: assets/vidro.js) ── */
 for (const el of $$('[data-toque]:not(.lg)')) {
   if (calmo) break;
@@ -204,9 +272,32 @@ for (const el of $$('[data-toque]:not(.lg)')) {
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) el.addEventListener(ev, () => vai(1));
 }
 
+/* ── Planilha do cartão "etapa por etapa": o vermelho (executado) cresce com a rolagem até o teto ── */
+const acompanha = $('.planilha[data-acompanha]');
+if (acompanha) {
+  const barras = $$('.planilha-barra', acompanha);
+  const etapasEl = $$('.etapa');
+  const idx = etapasEl.findIndex((el) => el.contains(acompanha));
+  let ant = -1;
+  const pinta = (q) => {
+    barras.forEach((b, k) => {
+      const v = Math.max(0, Math.min(1, (q - (idx - 0.6) - k * 0.22) / 0.5));
+      b.style.setProperty('--feito', v.toFixed(3));
+    });
+  };
+  if (calmo) pinta(idx + 2);
+  else {
+    tarefa(() => {
+      const q = R.estado.processoP;
+      if (Math.abs(q - ant) > 1e-4) { ant = q; pinta(q); }
+      return false;
+    });
+  }
+}
+
 /* ── Sem 3D: colagem parada no topo, grade de cartões e etapas em coluna ── */
 function sem3d(onde = 'tudo') {
-  if (onde === 'tudo' || onde === 'hero') {
+  if ((onde === 'tudo' || onde === 'hero') && $('.hero-colagem')) {
     raiz.classList.add('sem-3d-hero');
     const colagem = $('.hero-colagem');
     if (!colagem.childElementCount) {
@@ -214,44 +305,49 @@ function sem3d(onde = 'tudo') {
     }
   }
   if (onde === 'tudo') raiz.classList.add('sem-3d');
-  if (onde === 'tudo' || onde === 'carrossel') obras.dataset.modo = 'grade';
-  if (onde === 'processo') $('#como-trabalhamos').classList.add('sem-3d');
+  if ((onde === 'tudo' || onde === 'carrossel') && obras) obras.dataset.modo = 'grade';
+  if (onde === 'processo') $('.processo')?.classList.add('sem-3d');
   R.medir(); // a página mudou de altura
 }
-if (calmo) obras.dataset.modo = 'grade'; // reduzir movimento: sem carrossel girando
 
-/* ── 3D (three.js): só se o aparelho tiver WebGL 2 ── */
+/* ── 3D (three.js): só se o aparelho tiver WebGL 2 e a página tiver alguma cena ── */
 const avisoFalha = (onde, erro) => { console.warn(`[Dia de Obra] 3D desligado (${onde}):`, erro); sem3d(onde); };
-if (!('WebGL2RenderingContext' in window)) {
-  sem3d();
-} else {
-  import(new URL('cenas-3d.js', AQUI).href)
-    .then((m) => m.iniciar({
-      casas: CASAS,
-      foto,
-      calmo,
-      logo: new URL('logo-dia-de-obra-v2.png', AQUI).href,
-      Mola,
-      MOLAS,
-      tarefa,
-      acorda,
-      estado: R.estado, // progresso de cada parte, já suavizado (assets/rolagem.js)
-      hero: { el: $('.hero-3d'), texto: $('.hero-texto'), aoEscolher(i) { selecionar(i); rolarPara(obras); } },
-      carrossel: calmo ? null : {
-        el: $('.carrossel'),
-        aoMudar(i) { selecionar(i, 'carrossel'); },
-        aoAbrir(i) { abrir(i); },
-        aoPronto(ctrl) { carrossel = ctrl; if (pendenteIr != null) { ctrl.ir(pendenteIr, true); pendenteIr = null; } },
-      },
-      processo: { el: $('.processo-3d') },
-      aoFalhar: avisoFalha,
-    }))
-    .catch((erro) => avisoFalha('tudo', erro));
+const heroEl = $('.hero-3d');
+const carrosselEl = $('.carrossel');
+const processoEl = $('.processo-3d');
+if (heroEl || carrosselEl || processoEl) {
+  if (!('WebGL2RenderingContext' in window)) {
+    sem3d();
+  } else {
+    const mapa = processoEl?.dataset.mapa?.split(',').map((par) => par.split(':').map(Number));
+    import(new URL('cenas-3d.js', AQUI).href)
+      .then((m) => m.iniciar({
+        casas: CASAS,
+        foto,
+        calmo,
+        logo: new URL('logo-dia-de-obra-v2.png', AQUI).href,
+        Mola,
+        MOLAS,
+        tarefa,
+        acorda,
+        estado: R.estado, // progresso de cada parte, já suavizado (assets/rolagem.js)
+        hero: heroEl ? { el: heroEl, texto: $('.hero-texto'), aoEscolher(i) { if (obras) { selecionar(i); rolarPara(obras); } else location.href = './#obras'; } } : null,
+        carrossel: carrosselEl && !calmo ? {
+          el: carrosselEl,
+          aoMudar(i) { selecionar(i, 'carrossel'); },
+          aoAbrir(i) { abrir(i); },
+          aoPronto(ctrl) { carrossel = ctrl; if (pendenteIr != null) { ctrl.ir(pendenteIr, true); pendenteIr = null; } },
+        } : null,
+        processo: processoEl ? { el: processoEl, mapa, barras: processoEl.hasAttribute('data-barras') } : null,
+        aoFalhar: avisoFalha,
+      }))
+      .catch((erro) => avisoFalha('tudo', erro));
+  }
 }
 
-// rolagem: mede a página já montada e liga os efeitos que acompanham a rolagem
+// rolagem: mede a página já montada e liga a cor de fundo e os efeitos que acompanham a rolagem
 R.iniciar();
 
-/* Para o Gerente: lista do que ainda falta preencher (abra o console do navegador). */
+/* Para o Gerente: lista do que ainda falta confirmar (abra o console do navegador). */
 console.info('[Dia de Obra] pendentes:', $$('[data-pendente]').map((el) => el.dataset.pendente));
 })();

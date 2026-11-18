@@ -23,6 +23,58 @@ window.DiaDeObraRolagem = (() => {
   // valores lidos pelas cenas 3D a cada quadro
   const estado = { y: scrollY, vh: innerHeight, heroP: 0, obrasP: 0, processoP: -1, movel: false };
 
+  /* ───────────── cor de fundo contínua ─────────────
+     Cada seção só declara a sua cor (data-fundo). O fundo é um só (o do html) e, na faixa entre
+     duas seções, passa de uma cor para a outra na proporção da rolagem, pela mola. O texto das seções
+     (variáveis --tinta, --tinta-2 e --acento) escolhe a cor de maior contraste com o fundo daquele
+     instante, então fica AA o tempo todo, inclusive no meio da passagem. */
+  const PALETA = { vermelho: [224, 0, 0], creme: [251, 241, 220], escuro: [23, 24, 21] };
+  const lin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const luminancia = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  function corDoFundo(y) {
+    const f = M.fundos;
+    if (!f || !f.length) return null;
+    const sonda = y + M.vh * 0.5;          // o meio da tela decide a cor
+    const faixa = M.vh * 0.32;             // largura da passagem entre duas seções
+    for (let k = 1; k < f.length; k++) {
+      const d = sonda - f[k].top;
+      if (Math.abs(d) < faixa) {
+        const t = suaviza(limita((d + faixa) / (2 * faixa), 0, 1));
+        return f[k - 1].cor.map((c, i) => c + (f[k].cor[i] - c) * t);
+      }
+    }
+    let atual = f[0].cor;
+    for (const s of f) if (sonda >= s.top) atual = s.cor;
+    return atual;
+  }
+  const fundoR = new Mola(224, MOLAS.derivado, 0.2);
+  const fundoG = new Mola(0, MOLAS.derivado, 0.2);
+  const fundoB = new Mola(0, MOLAS.derivado, 0.2);
+  let modoTexto = '';
+  function pintarFundo(rgb) {
+    const [r, g, b] = rgb.map((c) => Math.round(c));
+    raiz.style.backgroundColor = `rgb(${r},${g},${b})`;
+    const L = luminancia([r, g, b]);
+    // creme no escuro; creme-claro no vermelho; branco/preto puros na passagem (contraste ≥ 4,58)
+    const modo = L > 0.45 ? 'claro' : L >= 0.179 ? 'preto' : L > 0.16 ? 'branco' : L > 0.03 ? 'vermelho' : 'escuro';
+    if (modo === modoTexto) return;
+    modoTexto = modo;
+    const T = {
+      claro: ['#171815', 'rgba(23,24,21,.76)', '#C00000'],
+      preto: ['#000', '#000', '#000'],
+      branco: ['#fff', '#fff', '#fff'],
+      vermelho: ['#FFF7E8', '#FFF7E8', '#FFF7E8'],
+      escuro: ['#FBF1DC', 'rgba(251,241,220,.82)', '#FF8A7E'],
+    }[modo];
+    raiz.style.setProperty('--tinta', T[0]);
+    raiz.style.setProperty('--tinta-2', T[1]);
+    raiz.style.setProperty('--acento', T[2]);
+  }
+  function guardarFundo() {
+    try { sessionStorage.setItem('dob-fundo', raiz.style.backgroundColor); } catch (e) { /* sem armazenamento: tudo bem */ }
+  }
+  addEventListener('pagehide', guardarFundo);
+
   /* ───────────── medidas (fora do laço) ───────────── */
   const M = { vh: innerHeight, max: 0, hero: null, carrossel: null, etapas: [], revela: [], linha: 0.62 };
   function topoDoc(el) {
@@ -41,6 +93,7 @@ window.DiaDeObraRolagem = (() => {
     M.linha = estado.movel ? 0.78 : 0.55; // linha de leitura das etapas (fração da altura da tela)
     // cada etapa fica "no meio" (k + 0,5) quando o centro do cartão passa pela linha de leitura
     M.etapas = $$('.etapa').map((el) => ({ el, centro: topoDoc(el) + el.offsetHeight / 2 }));
+    M.fundos = $$('[data-fundo]').map((el) => ({ top: topoDoc(el), cor: PALETA[el.dataset.fundo] || PALETA.escuro })).sort((a, b) => a.top - b.top);
     for (const r of M.revela) {
       r.top = topoDoc(r.el);
       r.h = r.el.offsetHeight;
@@ -178,11 +231,25 @@ window.DiaDeObraRolagem = (() => {
       ys.alvo = rodando ? roda.x : scrollY;
       if (ys.passo(dt)) mexe = true;
       aplicar(ys.x);
+      const cor = corDoFundo(ys.x);
+      if (cor) {
+        fundoR.alvo = cor[0];
+        fundoG.alvo = cor[1];
+        fundoB.alvo = cor[2];
+        if (fundoR.passo(dt)) mexe = true;
+        if (fundoG.passo(dt)) mexe = true;
+        if (fundoB.passo(dt)) mexe = true;
+        pintarFundo([fundoR.x, fundoG.x, fundoB.x]);
+      }
       return mexe;
     });
   } else {
-    // parado: os valores seguem a rolagem direto, sem mola e sem efeito visual
-    addEventListener('scroll', () => { estado.y = scrollY; }, { passive: true });
+    // parado: os valores e o fundo seguem a rolagem direto, sem mola e sem efeito visual
+    addEventListener('scroll', () => {
+      estado.y = scrollY;
+      const cor = corDoFundo(scrollY);
+      if (cor) pintarFundo(cor);
+    }, { passive: true });
   }
 
   /* ───────────── início ───────────── */
@@ -190,6 +257,16 @@ window.DiaDeObraRolagem = (() => {
     registrarRevelar();
     medir();
     ys.pula(scrollY);
+    // fundo: começa da cor em que a página anterior estava (continuidade entre páginas) ou já na certa
+    const alvo = corDoFundo(scrollY);
+    if (alvo) {
+      const m = /rgb\((\d+),\s*(\d+),\s*(\d+)/.exec(raiz.style.backgroundColor || '');
+      const ini = m && !calmo ? m.slice(1, 4).map(Number) : alvo;
+      fundoR.pula(ini[0]);
+      fundoG.pula(ini[1]);
+      fundoB.pula(ini[2]);
+      pintarFundo(ini);
+    }
     // os efeitos só são aplicados dentro do laço: se a animação não rodar (aba escondida,
     // navegador sem requestAnimationFrame), nada fica escondido
     acorda();

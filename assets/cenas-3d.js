@@ -829,6 +829,47 @@ function criarProcesso(cfg, calmo, logoUrl) {
     camera.lookAt(alvoCam);
   }
 
+  // ── planilha 3D (página Como funciona): uma barra por etapa, na frente do lote. A barra clara é o
+  //    teto que a planilha deu para a etapa; a vermelha é o executado, que cresce com a obra e nunca
+  //    passa do teto. Quando a casa fica pronta, as barras afundam: a planilha virou a casa.
+  const barras = [];
+  if (cfg.barras) {
+    const tetoMat = new THREE.MeshLambertMaterial({ color: CREME, transparent: true, opacity: 0.38, depthWrite: false });
+    const feitoMat = L(VERMELHO);
+    [1.2, 2.4, 2.0, 1.5, 1.7, 2.6].forEach((alt, k) => {
+      const g = new THREE.Group();
+      g.position.set(-5.5 + k * 2.2, 0, 6.4);
+      const teto = new THREE.Mesh(new THREE.BoxGeometry(1.3, alt, 1.0).translate(0, alt / 2, 0), tetoMat);
+      const feito = new THREE.Mesh(new THREE.BoxGeometry(1.18, alt * 0.995, 0.88).translate(0, alt * 0.995 / 2, 0), feitoMat);
+      feito.scale.y = 1e-3;
+      g.add(teto, feito);
+      scene.add(g);
+      barras.push({ g, feito, k, mostra: new Mola(0, MOLAS.peca, 1e-3), enche: new Mola(0, MOLAS.peca, 1e-3) });
+    });
+  }
+  // mapa cartão → montagem: "q" é o cartão (0 a n, contínuo), "p" é a montagem da casa (0 a 4)
+  const mapa = cfg.mapa;
+  const montagem = (q) => {
+    if (!mapa) return q;
+    if (q <= mapa[0][0]) return mapa[0][1] + (q - mapa[0][0]) * (mapa[1][1] - mapa[0][1]) / (mapa[1][0] - mapa[0][0]);
+    for (let i = 1; i < mapa.length; i++) {
+      if (q <= mapa[i][0]) {
+        const [q0, p0] = mapa[i - 1];
+        const [q1, p1] = mapa[i];
+        return p0 + ((q - q0) / (q1 - q0)) * (p1 - p0);
+      }
+    }
+    return mapa[mapa.length - 1][1];
+  };
+  function definirBarras(q, imediato) {
+    for (const b of barras) {
+      const mostra = clamp((q - 2.9) / 0.5, 0, 1) * (1 - clamp((q - 6.95) / 0.45, 0, 1));
+      const enche = clamp((q - 5.9 - b.k * 0.22) / 0.4, 0, 1);
+      if (imediato) { b.mostra.pula(mostra); b.enche.pula(enche); }
+      else { b.mostra.alvo = mostra; b.enche.alvo = enche; }
+    }
+  }
+
   let pAnt = NaN;
   function definirProgresso(p, imediato) {
     for (const q of pecas) {
@@ -845,12 +886,22 @@ function criarProcesso(cfg, calmo, logoUrl) {
   c.atualizar = (dt) => {
     let mexe = false;
     if (!calmo) {
-      const p = estado.processoP; // já suavizado pela rolagem
-      if (p !== pAnt) {
-        pAnt = p;
-        definirProgresso(p, false);
+      const q = estado.processoP; // já suavizado pela rolagem
+      if (q !== pAnt) {
+        pAnt = q;
+        definirProgresso(montagem(q), false);
+        definirBarras(q, false);
         mexe = true;
       }
+    }
+    for (const b of barras) {
+      if (b.mostra.passo(dt)) mexe = true;
+      if (b.enche.passo(dt)) mexe = true;
+      const s = Math.max(b.mostra.x, 1e-3);
+      b.g.scale.set(1, s, 1);
+      b.g.visible = b.mostra.x > 0.03;
+      b.feito.scale.y = Math.max(b.enche.x, 1e-3);
+      b.feito.visible = b.enche.x > 0.004;
     }
     if (apagar.passo(dt)) mexe = true;
     for (const q of pecas) {
@@ -870,7 +921,8 @@ function criarProcesso(cfg, calmo, logoUrl) {
     posicionarCamera();
     return;
   }
-  definirProgresso(estado.processoP, true);
+  definirProgresso(montagem(estado.processoP), true);
+  definirBarras(estado.processoP, true);
   for (const q of pecas) aplicar(q);
   posicionarCamera();
   // paralaxe pelo mouse sobre a seção (posição do ponteiro na janela, sem medir nada)
@@ -887,17 +939,19 @@ export function iniciar(op) {
   ({ Mola, MOLAS, tarefa, estado } = op);
   acordaGlobal = op.acorda;
   falhou = op.aoFalhar || falhou;
-  try {
-    criarHero(op.hero, op.casas, op.foto, op.calmo);
-  } catch (e) {
-    falhou('hero', e);
+  if (op.hero) {
+    try {
+      criarHero(op.hero, op.casas, op.foto, op.calmo);
+    } catch (e) {
+      falhou('hero', e);
+    }
   }
   if (op.carrossel) {
     quandoPerto(op.carrossel.el, () => {
       criarCarrossel(op.carrossel, op.casas, op.foto, op.calmo).catch((e) => falhou('carrossel', e));
     });
   }
-  quandoPerto(op.processo.el, () => {
+  if (op.processo) quandoPerto(op.processo.el, () => {
     try {
       criarProcesso(op.processo, op.calmo, op.logo);
     } catch (e) {
