@@ -23,7 +23,7 @@ window.DiaDeObraMola = (() => {
     peca: { response: 0.32, dampingFraction: 1 },       // peças da casa (seguem a rolagem nos dois sentidos)
     linha: { response: 0.5, dampingFraction: 1 },
     camera: { response: 0.7, dampingFraction: 1 },
-    entrada: { response: 1.1, dampingFraction: 0.84 },  // fotos do topo chegando
+    entrada: { response: 0.75, dampingFraction: 0.84 }, // fotos do topo chegando
   };
 
   class Mola {
@@ -42,7 +42,8 @@ window.DiaDeObraMola = (() => {
     // avança dt segundos; devolve true enquanto ainda se mexe
     passo(dt) {
       if (this.parada) return false;
-      const passo = Math.min(dt, 1 / 10); // em aparelho lento a mola segue no tempo real (até 10 quadros/s)
+      const passo = Math.min(dt, 0.6); // a mola segue o tempo real mesmo com quadros lentos (página carregando);
+      // os passos internos de 1/240 s mantêm a conta estável com qualquer intervalo
       const n = Math.max(1, Math.ceil(passo * 240));
       const h = passo / n;
       for (let i = 0; i < n; i++) {
@@ -76,7 +77,7 @@ window.DiaDeObraMola = (() => {
   function laco(ms) {
     raf = 0;
     const t = ms / 1000;
-    const dt = ultimo ? Math.min(t - ultimo, 0.1) : 1 / 60;
+    const dt = ultimo ? Math.min(t - ultimo, 0.6) : 1 / 60;
     ultimo = t;
     medidor.quadros++;
     let segue = false;

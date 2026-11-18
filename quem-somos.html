@@ -23,7 +23,9 @@
 <!-- as outras páginas já vêm baixadas: a troca de página não espera rede -->
 <link rel="prefetch" href="./"><link rel="prefetch" href="como-funciona.html">
 <!-- fundo já na cor certa no primeiro quadro (continua a cor da página anterior) e título pronto para entrar -->
-<script>(function(){var h=document.documentElement;try{var c=sessionStorage.getItem('dob-fundo');if(c)h.style.backgroundColor=c}catch(e){}if(!matchMedia('(prefers-reduced-motion: reduce)').matches){h.classList.add('entrando');setTimeout(function(){h.classList.remove('entrando')},1600)}})()</script>
+<script>(function(){var h=document.documentElement;try{var c=sessionStorage.getItem('dob-fundo');if(c)h.style.backgroundColor=c}catch(e){}if(!matchMedia('(prefers-reduced-motion: reduce)').matches){h.classList.add('entrando');setTimeout(function(){h.classList.remove('entrando')},900)}})()</script>
+<!-- view transition entre páginas: as promessas são tratadas (sem erro no console) e a transição é pulada se não couber -->
+<script>(function(){function cuida(t,pular){if(!t)return;try{['ready','finished','updateCallbackDone'].forEach(function(k){if(t[k]&&t[k].catch)t[k].catch(function(){})});if(pular)t.skipTransition()}catch(x){}}addEventListener('pagereveal',function(e){cuida(e.viewTransition,document.visibilityState==='hidden'||matchMedia('(prefers-reduced-motion: reduce)').matches)});addEventListener('pageswap',function(e){cuida(e.viewTransition,false)})})()</script>
 <!-- three.js com versão fixa (a mesma do tour da obra) e conferência de integridade -->
 <script type="importmap">
 {

@@ -318,7 +318,7 @@ function criarHero(cfg, casas, foto, calmo) {
       malhas.push(malha);
       posicionar();
       if (calmo) p.entra.pula(1);
-      else setTimeout(() => { p.entra.alvo = 1; acordar(); }, 120 + i * 110);
+      else setTimeout(() => { p.entra.alvo = 1; acordar(); }, 60 + i * 70);
       acordar();
     }).catch((e) => console.warn('[Dia de Obra] foto não carregou no topo', e));
   });

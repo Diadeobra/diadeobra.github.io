@@ -257,7 +257,17 @@ if (titulo && !calmo) {
       });
     },
   };
-  partes.forEach((p, i) => setTimeout(() => { molas[i].alvo = 1; anima(item); }, 60 + i * 70));
+  if (document.hidden) { for (const m of molas) m.pula(1); item.desenha(); }
+  else {
+    partes.forEach((p, i) => { molas[i].alvo = 1; molas[i].atraso = i * 0.06; });
+    // começa no mesmo quadro (sem esperar fontes, 3D ou pagereveal); cada palavra sai 60 ms depois da anterior
+    const t0 = performance.now();
+    const passoOrig = molas.map((m) => m.passo.bind(m));
+    molas.forEach((m, i) => { m.passo = (dt) => ((performance.now() - t0) / 1000 < m.atraso ? true : passoOrig[i](dt)); });
+    anima(item);
+    // rede de segurança: se a animação não rodar, o título fica no lugar em 0,7 s
+    setTimeout(() => { if (molas.some((m) => m.x < 0.98)) { for (const m of molas) m.pula(1); item.desenha(); } }, 700);
+  }
 } else {
   raiz.classList.remove('entrando');
 }
